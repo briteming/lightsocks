@@ -12,12 +12,13 @@ def get_key_iv(key):
     return key, iv
 
 _KEY, _IV = get_key_iv(KEY)
-aes = AES.new(_KEY, AES.MODE_CFB, _IV)
 
 def encrypt(text):
+    aes = AES.new(_KEY, AES.MODE_CFB, _IV)
     return aes.encrypt(text)
 
 def decrypt(ciphertext):
+    aes = AES.new(_KEY, AES.MODE_CFB, _IV)
     return aes.decrypt(ciphertext)
 
 if __name__ == "__main__":
