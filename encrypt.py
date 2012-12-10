@@ -1,21 +1,28 @@
 import hashlib
 from Crypto.Cipher import AES
-KEY = '22'
+from config import KEY
 
 def md5(s):
     return hashlib.md5(s).hexdigest()
 
-def get_key_iv():
+def get_key_iv(key):
     for i in range(4):
         key = md5(key + str(i))
     iv = md5(key)[:16]
     return key, iv
 
-key, iv = get_key_iv(KEY)
+_KEY, _IV = get_key_iv(KEY)
+aes = AES.new(_KEY, AES.MODE_CFB, _IV)
 
-aes = AES.new(key, AES.MODE_CFB, iv)
-plaintext = 'Hello Bob. Please save me!'
-ciphertext = aes.encrypt(plaintext)
-print ciphertext
-aes = AES.new(key, AES.MODE_CFB, iv)
-print aes.decrypt(ciphertext)
+def encrypt(text):
+    return aes.encrypt(text)
+
+def decrypt(ciphertext):
+    return aes.decrypt(ciphertext)
+
+if __name__ == "__main__":
+    # simple test
+    s = "Hello Bob. Please save me!"
+    assert(encrypt(s) != s)
+    assert(decrypt(encrypt(s)) == s)
+    print "OK."

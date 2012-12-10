@@ -1,3 +1,4 @@
+KEY = "QWERDSF@#AS2@#af@#dfSDFA2_)3asdF(ASDF23dfadf#Q@#^$ADfads"
 SERVER_IP = "0.0.0.0"
 SERVER_PORT = 8388
 LOCAL_IP = "127.0.0.1"
