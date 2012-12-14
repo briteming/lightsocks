@@ -1,29 +1,33 @@
-import hashlib
-from Crypto.Cipher import AES
 from config import KEY
+import hashlib
+import string
+import struct
 
-def md5(s):
-    return hashlib.md5(s).hexdigest()
+def get_table(key):
+    """
+    Algorithm from @clowwindy
+    https://github.com/clowwindy/shadowsocks
+    """
+    s = hashlib.md5(key).digest()
+    a, b = struct.unpack('<QQ', s)
+    table = [ord(c) for c in string.maketrans('', '')]
+    for i in xrange(1, 1024):
+        table.sort(lambda x, y: int(a % (x + i) - a % (y + i)))
+    return ''.join([chr(x) for x in table])
 
-def get_key_iv(key):
-    for i in range(4):
-        key = md5(key + str(i))
-    iv = md5(key)[:16]
-    return key, iv
+ENCODE_TABLE = get_table(KEY)
+DECODE_TABLE = string.maketrans(ENCODE_TABLE, string.maketrans('', ''))
 
-_KEY, _IV = get_key_iv(KEY)
+def encrypt(s):
+    return s.translate(ENCODE_TABLE)
 
-def encrypt(text):
-    aes = AES.new(_KEY, AES.MODE_CFB, _IV)
-    return aes.encrypt(text)
-
-def decrypt(ciphertext):
-    aes = AES.new(_KEY, AES.MODE_CFB, _IV)
-    return aes.decrypt(ciphertext)
+def decrypt(s):
+    return s.translate(DECODE_TABLE)
 
 if __name__ == "__main__":
     # simple test
     s = "Hello Bob. Please save me!"
-    assert(encrypt(s) != s)
-    assert(decrypt(encrypt(s)) == s)
+    e = encrypt(s)
+    assert(e != s)
+    assert(decrypt(e) == s)
     print "OK."
