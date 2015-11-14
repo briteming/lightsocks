@@ -61,7 +61,7 @@ class Socket5Handler(SocketServer.BaseRequestHandler):
             dest_address = "%s%s%s" % (chr(len(addr)), addr, addr_port)
             remote.sendall(dest_address)
             self.handle_tcp(remote)
-        except socket.error, e:
+        except socket.error as e:
             logging.warn(e)
         finally:
             self.request.close()
@@ -70,7 +70,21 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     allow_reuse_address = True
 
 if __name__ == "__main__":
-    logging.basicConfig(format='[%(asctime)s] %(levelname)s: %(message)s', level=logging.INFO)
-    server = ThreadedTCPServer((LOCAL_IP, LOCAL_PORT), Socket5Handler)
-    logging.info('Server running at %s ...' % LOCAL_PORT)
+    import argparse
+    parser = argparse.ArgumentParser(description='Lightsocks')
+    parser.add_argument('--log-file', '-l', type=str)
+    parser.add_argument('--port', '-p', type=int)
+    args = parser.parse_args()
+
+    local_port = args.port if args.port else LOCAL_PORT
+    log_file = args.log_file if args.log_file else '/tmp/lightsocks.log'
+
+    logging.basicConfig(
+        format='[%(asctime)s] %(levelname)s: %(message)s',
+        level=logging.INFO,
+        filename=log_file,
+    )
+    server = ThreadedTCPServer((LOCAL_IP, local_port), Socket5Handler)
+    logging.info('Local server running at {}:{} ...'.format(
+        LOCAL_IP, local_port))
     server.serve_forever()
