@@ -64,8 +64,6 @@ class LightHandler(socketserver.BaseRequestHandler):
         if data_port is None:
             return
         port = int.from_bytes(data_port, 'big')
-
-        D['C'] += 1
         logging.info("connecting to {}:{}".format(addr, port))
         remote = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -73,6 +71,8 @@ class LightHandler(socketserver.BaseRequestHandler):
         except:
             logging.error('cannot connect to {}:{}'.format(addr, port))
             return
+
+        D['C'] += 1
         logging.info("waiting for {}:{}".format(addr, port))
         try:
             self.handle_tcp(remote)
