@@ -5,7 +5,6 @@ from encrypt import encrypt, decrypt
 from select import select
 import logging
 import socket
-import struct
 
 D = {'C': 0}
 
@@ -17,7 +16,6 @@ def safe_recv(sock, size):
 
     size_left = size - len(data)
     while size_left > 0:
-        time.sleep(0.01)
         _data = sock.recv(size_left)
         if not _data:
             return None
@@ -59,7 +57,12 @@ class LightHandler(socketserver.BaseRequestHandler):
         if data_addr is None:
             return
 
-        addr = decrypt(data_addr).decode()
+        try:
+            addr = decrypt(data_addr).decode()
+        except:
+            logging.error('cannot decode: {}'.format(data_addr))
+            return
+
         data_port = safe_recv(self.request, 2)
         if data_port is None:
             return
