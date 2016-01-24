@@ -10,6 +10,22 @@ import struct
 D = {'C': 0}
 
 
+def safe_recv(sock, size):
+    data = sock.recv(size)
+    if not data:
+        return None
+
+    size_left = size - len(data)
+    while size_left > 0:
+        time.sleep(0.01)
+        _data = sock.recv(size_left)
+        if not _data:
+            return None
+        data += _data
+        size_left = size_left - len(_data)
+    return data
+
+
 class LightHandler(socketserver.BaseRequestHandler):
     def handle_tcp(self, remote):
         sock = self.request
@@ -36,21 +52,28 @@ class LightHandler(socketserver.BaseRequestHandler):
         data = self.request.recv(1)
         if not data:
             return
-        D['C'] += 1
         logging.info('client connected [{}]'.format(D['C']))
 
-        addr_bytes_length = data[0]
-        addr = self.request.recv(addr_bytes_length)
-        addr = decrypt(addr).decode()
-        addr_port = struct.unpack("!H", self.request.recv(2))[0]
-        logging.info("connecting to {}:{}".format(addr, addr_port))
+        addr_length = data[0]
+        data_addr = safe_recv(self.request, addr_length)
+        if data_addr is None:
+            return
+
+        addr = decrypt(data_addr).decode()
+        data_port = safe_recv(self.request, 2)
+        if data_port is None:
+            return
+        port = int.from_bytes(data_port, 'big')
+
+        D['C'] += 1
+        logging.info("connecting to {}:{}".format(addr, port))
         remote = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            remote.connect((addr, addr_port))
+            remote.connect((addr, port))
         except:
-            logging.error('cannot connect to {}:{}'.format(addr, addr_port))
+            logging.error('cannot connect to {}:{}'.format(addr, port))
             return
-        logging.info("waiting for {}:{}".format(addr, addr_port))
+        logging.info("waiting for {}:{}".format(addr, port))
         try:
             self.handle_tcp(remote)
         finally:
@@ -66,7 +89,8 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 if __name__ == "__main__":
     logging.basicConfig(
         format='[%(asctime)s] %(levelname)s: %(message)s',
-        level=logging.DEBUG,
+        level=logging.INFO,
+        filename='/tmp/lightsocks-server.log',
     )
     server = ThreadedTCPServer((SERVER_IP, SERVER_PORT), LightHandler)
     logging.info('Proxy running at {}:{} ...'.format(
