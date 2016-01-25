@@ -1,11 +1,11 @@
 #! /usr/bin/env python3
 from config import LOCAL_IP, LOCAL_PORT, SERVER_IP, SERVER_PORT
-from encrypt import encrypt, decrypt
 from select import select
 import socketserver
 import logging
 import socket
 import struct
+import cipher
 
 D = {'R': 0}
 
@@ -20,13 +20,13 @@ class Socket5Handler(socketserver.BaseRequestHandler):
                 data = remote.recv(8192)
                 if not data:
                     break
-                if (sock.send(decrypt(data)) <= 0):
+                if (sock.send(cipher.decrypt(data)) <= 0):
                     break
             if sock in read_list:
                 data = sock.recv(8192)
                 if not data:
                     break
-                if (remote.send(encrypt(data)) <= 0):
+                if (remote.send(cipher.encrypt(data)) <= 0):
                     break
 
     def handle(self):
@@ -78,7 +78,7 @@ class Socket5Handler(socketserver.BaseRequestHandler):
 
 
             # encrypt address before sending it
-            addr = encrypt(addr)
+            addr = cipher.encrypt(addr)
             dest_address = bytearray()
             dest_address += len(addr).to_bytes(1, 'big')
             dest_address += addr

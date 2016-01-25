@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 import socketserver
 from config import SERVER_IP, SERVER_PORT
-from encrypt import encrypt, decrypt
 from select import select
 import logging
 import socket
+import cipher
 
 D = {'C': 0}
 
@@ -34,7 +34,7 @@ class LightHandler(socketserver.BaseRequestHandler):
                 data = remote.recv(8192)
                 if not data:
                     break
-                if (sock.send(encrypt(data)) <= 0):
+                if (sock.send(cipher.encrypt(data)) <= 0):
                     logging.error('send to client error')
                     break
 
@@ -42,7 +42,7 @@ class LightHandler(socketserver.BaseRequestHandler):
                 data = sock.recv(8192)
                 if not data:
                     break
-                if (remote.send(decrypt(data)) <= 0):
+                if (remote.send(cipher.decrypt(data)) <= 0):
                     logging.info('send to server error')
                     break
 
@@ -58,7 +58,7 @@ class LightHandler(socketserver.BaseRequestHandler):
             return
 
         try:
-            addr = decrypt(data_addr).decode()
+            addr = cipher.decrypt(data_addr).decode()
         except:
             logging.error('cannot decode: {}'.format(data_addr))
             return
