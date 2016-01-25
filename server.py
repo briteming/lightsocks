@@ -1,10 +1,11 @@
 #! /usr/bin/env python
+import cipher
 import socketserver
-from config import SERVER_IP, SERVER_PORT
-from select import select
 import logging
 import socket
-import cipher
+
+from config import SERVER_IP, SERVER_PORT
+from select import select
 
 D = {'C': 0}
 

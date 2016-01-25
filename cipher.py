@@ -5,7 +5,7 @@ from Crypto import Random
 from config import KEY
 
 BS = 16
-pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS) 
+pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS).encode()
 unpad = lambda s : s[:-ord(s[len(s)-1:])]
 
 
@@ -34,7 +34,6 @@ def decrypt(enc):
 
 
 def encrypt(raw):
-    raw = raw.decode('utf-8')
     return ci.encrypt(raw)
 
 
