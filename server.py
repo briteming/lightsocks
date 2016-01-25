@@ -6,23 +6,9 @@ import socket
 
 from config import SERVER_IP, SERVER_PORT
 from select import select
+from tools import safe_recv, u16_to_bytes, bytes_to_int
 
 D = {'C': 0}
-
-
-def safe_recv(sock, size):
-    data = sock.recv(size)
-    if not data:
-        return None
-
-    size_left = size - len(data)
-    while size_left > 0:
-        _data = sock.recv(size_left)
-        if not _data:
-            return None
-        data += _data
-        size_left = size_left - len(_data)
-    return data
 
 
 class LightHandler(socketserver.BaseRequestHandler):
@@ -35,16 +21,26 @@ class LightHandler(socketserver.BaseRequestHandler):
                 data = remote.recv(8192)
                 if not data:
                     break
-                if (sock.send(cipher.encrypt(data)) <= 0):
-                    logging.error('send to client error')
+                enc = cipher.encrypt(data)
+                length = len(enc)
+                logging.debug('send data to client: {}'.format(length))
+                sock.send(u16_to_bytes(length))
+                if (sock.send(enc) <= 0):
                     break
-
             if sock in read_list:
-                data = sock.recv(8192)
-                if not data:
+                data = safe_recv(sock, 2)
+                if data is None:
                     break
-                if (remote.send(cipher.decrypt(data)) <= 0):
-                    logging.info('send to server error')
+                length = bytes_to_int(data)
+                logging.debug('fetching data from client: {}'.format(length))
+
+                data = safe_recv(sock, length)
+                if data is None:
+                    break
+                dec = cipher.decrypt(data)
+                logging.debug('send data to server: {}'.format(len(dec)))
+                if (remote.send(dec) <= 0):
+                    logging.debug('send to server error')
                     break
 
     def handle(self):
@@ -67,7 +63,7 @@ class LightHandler(socketserver.BaseRequestHandler):
         data_port = safe_recv(self.request, 2)
         if data_port is None:
             return
-        port = int.from_bytes(data_port, 'big')
+        port = bytes_to_int(data_port)
         logging.info("connecting to {}:{}".format(addr, port))
         remote = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -94,7 +90,7 @@ if __name__ == "__main__":
     logging.basicConfig(
         format='[%(asctime)s] %(levelname)s: %(message)s',
         level=logging.INFO,
-        filename='/tmp/lightsocks-server.log',
+        # filename='/tmp/lightsocks-server.log',
     )
     server = ThreadedTCPServer((SERVER_IP, SERVER_PORT), LightHandler)
     logging.info('Proxy running at {}:{} ...'.format(
