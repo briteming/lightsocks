@@ -111,6 +111,8 @@ class Socket5Handler(socketserver.BaseRequestHandler):
         remote.sendall(dest_address)
         try:
             self.handle_tcp(remote)
+        except Exception as e:
+            logging.error('Got Exception: {}'.format(e))
         finally:
             remote.close()
             D['R'] -= 1
@@ -134,7 +136,7 @@ if __name__ == "__main__":
     logging.basicConfig(
         format='[%(asctime)s][%(levelname)s] %(message)s',
         level=logging.INFO,
-        filename=log_file,
+        #filename=log_file,
     )
     server = ThreadedTCPServer((LOCAL_IP, local_port), Socket5Handler)
     logging.info('Local server running at {}:{} ...'.format(
