@@ -90,7 +90,7 @@ if __name__ == "__main__":
     logging.basicConfig(
         format='[%(asctime)s] %(levelname)s: %(message)s',
         level=logging.INFO,
-        filename='/tmp/lightsocks-server.log',
+        # filename='/tmp/lightsocks-server.log',
     )
     server = ThreadedTCPServer((SERVER_IP, SERVER_PORT), LightHandler)
     logging.info('Proxy running at {}:{} ...'.format(

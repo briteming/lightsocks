@@ -1,6 +1,6 @@
 import os.path
 
-KEY = "0000-0000-0000"
+KEY = "x" * 16
 SERVER_IP = "0.0.0.0"
 SERVER_PORT = 1234
 LOCAL_IP = "127.0.0.1"

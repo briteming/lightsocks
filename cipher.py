@@ -1,7 +1,13 @@
 # http://stackoverflow.com/a/12525165/665869
 import base64
-from Crypto.Cipher import AES
-from Crypto import Random
+try:
+    from Crypto.Cipher import AES
+    from Crypto import Random
+except:
+    print('Cannot input Crypto, please install it:')
+    print('sudo pip3 install pycrypto==2.6.1')
+    exit(1)
+
 from config import KEY
 
 
