@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 from config import LOCAL_IP, LOCAL_PORT, SERVER_IP, SERVER_PORT
 from select import select
 from tools import safe_recv, u16_to_bytes, bytes_to_int
@@ -126,7 +126,8 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Lightsocks')
-    parser.add_argument('--log-file', '-l', type=str)
+    parser.add_argument('--log-file', '-l', type=str,
+                        default='/tmp/lightsocks.log')
     parser.add_argument('--port', '-p', type=int)
     args = parser.parse_args()
 
@@ -136,7 +137,7 @@ if __name__ == "__main__":
     logging.basicConfig(
         format='[%(asctime)s][%(levelname)s] %(message)s',
         level=logging.INFO,
-        #filename=log_file,
+        filename=log_file,
     )
     server = ThreadedTCPServer((LOCAL_IP, local_port), Socket5Handler)
     logging.info('Local server running at {}:{} ...'.format(
