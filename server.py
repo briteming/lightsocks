@@ -44,7 +44,14 @@ class LightHandler(socketserver.BaseRequestHandler):
                     break
 
     def handle(self):
-        data = self.request.recv(1)
+        try:
+            data = self.request.recv(1)
+        except ConnectionResetError:
+            logging.error('ConnectionResetError')
+            return
+        except Exception as e:
+            logging.error('Error: {}'.format(e))
+            return
         if not data:
             return
         logging.info('client connected [{}]'.format(D['C']))
