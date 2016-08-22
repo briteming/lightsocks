@@ -47,7 +47,7 @@ class Socket5Handler(socketserver.BaseRequestHandler):
         if data is None:
             return
         if data[0] != 5:
-            logging.error("socks version not 5")
+            logging.error("socks version not 5 but {}".format(data[0]))
             return
         data = safe_recv(self.request, 1)
         if data is None:
@@ -59,7 +59,7 @@ class Socket5Handler(socketserver.BaseRequestHandler):
         if b'\x00' not in methods:
             logging.error('client not support bare connect')
             return
-        logging.debug('got client initial data')
+        logging.debug('got client supported methods: {}'.format(methods))
 
         # Send initial SOCKS5 response (VER, METHOD)
         self.request.sendall(b'\x05\x00')
@@ -77,7 +77,7 @@ class Socket5Handler(socketserver.BaseRequestHandler):
 
         ver, cmd, rsv, atyp = data
         if ver != 5:
-            logging.error('ver should be 05')
+            logging.error('ver should be 05: {}'.format(ver))
             return
         if cmd == 1:  # CONNECT
             logging.info('client cmd is connect')
