@@ -145,10 +145,13 @@ if __name__ == "__main__":
     local_port = args.port if args.port else LOCAL_PORT
     log_file = args.log_file if args.log_file else '/tmp/lightsocks.log'
 
+    kwargs = {}
+    if args.log_file:
+        kwargs['filename'] = args.log_file
     logging.basicConfig(
         format='[%(asctime)s][%(levelname)s] %(message)s',
         level=logging.INFO,
-        filename=log_file,
+        **kwargs,
     )
     server = ThreadedTCPServer((LOCAL_IP, local_port), Socket5Handler)
     logging.info('Local server running at {}:{} ...'.format(
