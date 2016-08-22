@@ -53,14 +53,17 @@ class Socket5Handler(socketserver.BaseRequestHandler):
         if data is None:
             return
         length = bytes_to_int(data)
-        data = safe_recv(self.request, length)
-        if data is None:
+        methods = safe_recv(self.request, length)
+        if methods is None:
+            return
+        if b'\x00' not in methods:
+            logging.error('client not support bare connect')
             return
         logging.debug('got client initial data')
 
-        # Send initial SOCKS5 response
+        # Send initial SOCKS5 response (VER, METHOD)
         self.request.sendall(b'\x05\x00')
-        logging.debug('replied \\x05\\x00 to client')
+        logging.debug('replied ver, method to client')
 
         data = safe_recv(self.request, 4)
         if data is None:
@@ -73,9 +76,17 @@ class Socket5Handler(socketserver.BaseRequestHandler):
             return
 
         ver, cmd, rsv, atyp = data
-        if cmd != 1:
-            logging.error('bad cmd value: {}'.format(cmd))
+        if ver != 5:
+            logging.error('ver should be 05')
             return
+        if cmd == 1:  # CONNECT
+            logging.info('client cmd is connect')
+        elif cmd == 2:  # BIND
+            logging.info('client cmd is bind')
+        else:
+            logging.error('bad cmd from client: {}'.format(cmd))
+            return
+
         if atyp != 3:
             logging.error('bad atyp value: {}'.format(atyp))
             return
