@@ -2,6 +2,7 @@
 from config import LOCAL_IP, LOCAL_PORT, SERVER_IP, SERVER_PORT
 from select import select
 from tools import safe_recv, u16_to_bytes, bytes_to_int
+import ipaddress
 import socketserver
 import logging
 import socket
@@ -9,6 +10,9 @@ import struct
 import cipher
 
 D = {'R': 0}
+ATYP_IPV4 = 1
+ATYP_DOMAIN = 3
+ATYP_IPV6 = 4
 
 
 class Socket5Handler(socketserver.BaseRequestHandler):
@@ -80,19 +84,26 @@ class Socket5Handler(socketserver.BaseRequestHandler):
             logging.error('ver should be 05: {}'.format(ver))
             return
         if cmd == 1:  # CONNECT
-            logging.info('client cmd is connect')
+            logging.info('client cmd type: connect')
         elif cmd == 2:  # BIND
-            logging.info('client cmd is bind')
+            logging.info('client cmd type: bind')
         else:
             logging.error('bad cmd from client: {}'.format(cmd))
             return
 
-        if atyp != 3:
+        if atyp == ATYP_IPV6:
+            logging.error('do not support IPV6 yet')
+            return
+        elif atyp == ATYP_DOMAIN:
+            addr_len = ord(self.request.recv(1))
+            addr = self.request.recv(addr_len)
+        elif atyp == ATYP_IPV4:
+            addr = self.request.recv(4)
+            addr = str(ipaddress.ip_address(addr)).encode()
+        else:
             logging.error('bad atyp value: {}'.format(atyp))
             return
 
-        addr_len = ord(self.request.recv(1))
-        addr = self.request.recv(addr_len)
         addr_port = self.request.recv(2)
         logging.info('want to access {}:{}'.format(
             addr.decode(), int.from_bytes(addr_port, 'big')
