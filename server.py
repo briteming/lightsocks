@@ -88,7 +88,7 @@ class LightHandler(socketserver.BaseRequestHandler):
         except TimeoutError:
             logging.error('TimeoutError [{}]'.format(D['C']))
         except Exception as e:
-            logging.error('Error in handle_tcp(): {} [{}]'.format(e, D['C']))
+            logging.exception('Error in handle_tcp(): {} [{}]'.format(e, D['C']))
         finally:
             remote.close()
         D['C'] -= 1
