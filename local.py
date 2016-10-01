@@ -2,6 +2,7 @@
 from config import LOCAL_IP, LOCAL_PORT, SERVER_IP, SERVER_PORT
 from select import select
 from tools import safe_recv, u16_to_bytes, bytes_to_int
+import ipaddress
 import socketserver
 import logging
 import socket
@@ -9,6 +10,9 @@ import struct
 import cipher
 
 D = {'R': 0}
+ATYP_IPV4 = 1
+ATYP_DOMAIN = 3
+ATYP_IPV6 = 4
 
 
 class Socket5Handler(socketserver.BaseRequestHandler):
@@ -47,20 +51,23 @@ class Socket5Handler(socketserver.BaseRequestHandler):
         if data is None:
             return
         if data[0] != 5:
-            logging.error("socks version not 5")
+            logging.error("socks version not 5 but {}".format(data[0]))
             return
         data = safe_recv(self.request, 1)
         if data is None:
             return
         length = bytes_to_int(data)
-        data = safe_recv(self.request, length)
-        if data is None:
+        methods = safe_recv(self.request, length)
+        if methods is None:
             return
-        logging.debug('got client initial data')
+        if b'\x00' not in methods:
+            logging.error('client not support bare connect')
+            return
+        logging.debug('got client supported methods: {}'.format(methods))
 
-        # Send initial SOCKS5 response
+        # Send initial SOCKS5 response (VER, METHOD)
         self.request.sendall(b'\x05\x00')
-        logging.debug('replied \\x05\\x00 to client')
+        logging.debug('replied ver, method to client')
 
         data = safe_recv(self.request, 4)
         if data is None:
@@ -73,15 +80,30 @@ class Socket5Handler(socketserver.BaseRequestHandler):
             return
 
         ver, cmd, rsv, atyp = data
-        if cmd != 1:
-            logging.error('bad cmd value: {}'.format(cmd))
+        if ver != 5:
+            logging.error('ver should be 05: {}'.format(ver))
             return
-        if atyp != 3:
+        if cmd == 1:  # CONNECT
+            logging.info('client cmd type: connect')
+        elif cmd == 2:  # BIND
+            logging.info('client cmd type: bind')
+        else:
+            logging.error('bad cmd from client: {}'.format(cmd))
+            return
+
+        if atyp == ATYP_IPV6:
+            logging.error('do not support IPV6 yet')
+            return
+        elif atyp == ATYP_DOMAIN:
+            addr_len = ord(self.request.recv(1))
+            addr = self.request.recv(addr_len)
+        elif atyp == ATYP_IPV4:
+            addr = self.request.recv(4)
+            addr = str(ipaddress.ip_address(addr)).encode()
+        else:
             logging.error('bad atyp value: {}'.format(atyp))
             return
 
-        addr_len = ord(self.request.recv(1))
-        addr = self.request.recv(addr_len)
         addr_port = self.request.recv(2)
         logging.info('want to access {}:{}'.format(
             addr.decode(), int.from_bytes(addr_port, 'big')
@@ -134,10 +156,13 @@ if __name__ == "__main__":
     local_port = args.port if args.port else LOCAL_PORT
     log_file = args.log_file if args.log_file else '/tmp/lightsocks.log'
 
+    kwargs = {}
+    if args.log_file:
+        kwargs['filename'] = args.log_file
     logging.basicConfig(
         format='[%(asctime)s][%(levelname)s] %(message)s',
         level=logging.INFO,
-        filename=log_file,
+        **kwargs,
     )
     server = ThreadedTCPServer((LOCAL_IP, local_port), Socket5Handler)
     logging.info('Local server running at {}:{} ...'.format(
