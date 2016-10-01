@@ -76,6 +76,12 @@ class LightHandler(socketserver.BaseRequestHandler):
         logging.info("waiting for {}:{}".format(addr, port))
         try:
             self.handle_tcp(remote)
+        except ConnectionResetError:
+            logging.error('ConnectionResetError [{}]'.format(D['C']))
+        except TimeoutError:
+            logging.error('TimeoutError [{}]'.format(D['C']))
+        except Exception as e:
+            logging.error('Error in handle_tcp(): {} [{}]'.format(e, D['C']))
         finally:
             remote.close()
         D['C'] -= 1
@@ -90,7 +96,7 @@ if __name__ == "__main__":
     logging.basicConfig(
         format='[%(asctime)s] %(levelname)s: %(message)s',
         level=logging.INFO,
-        # filename='/tmp/lightsocks-server.log',
+        filename='/tmp/lightsocks-server.log',
     )
     server = ThreadedTCPServer((SERVER_IP, SERVER_PORT), LightHandler)
     logging.info('Proxy running at {}:{} ...'.format(
