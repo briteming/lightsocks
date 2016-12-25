@@ -7,7 +7,10 @@ def bytes_to_int(s):
 
 
 def safe_recv(sock, size):
-    data = sock.recv(size)
+    try:
+        data = sock.recv(size)
+    except ConnectionResetError:
+        return None
     if not data:
         return None
 
