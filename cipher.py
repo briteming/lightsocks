@@ -25,6 +25,8 @@ def unpad(s):
 
 class AESCipher:
     def __init__(self, key):
+        if isinstance(key, str):
+            key = key.encode()
         self.key = hashlib.sha256(key).digest()
 
     def encrypt(self, raw):
