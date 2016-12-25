@@ -68,7 +68,10 @@ func handleClient(client net.Conn) {
 		return
 	}
 	host, err := encrypt.Decrypt(buffer, key[:])
-	check(err)
+	if err != nil {
+		fmt.Printf("ERROR: cannot decrypt host.")
+		return
+	}
 
 	buffer = make([]byte, 2)
 	_, err = io.ReadFull(client, buffer)
@@ -138,7 +141,11 @@ func readDataFromClient(ch chan []byte, conn net.Conn, key []byte) {
 			return
 		}
 		data, err := encrypt.Decrypt(buffer, key)
-		check(err)
+		if err != nil {
+			fmt.Printf("ERROR: cannot decrypt data from client.")
+			ch <- nil
+			return
+		}
 		ch <- data
 	}
 }
