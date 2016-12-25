@@ -1,5 +1,6 @@
 *.py[co]
 *.log
+*.out
 *.beam
 *_local.py
 go/lightsocks

@@ -57,26 +57,26 @@ func handleClient(client net.Conn) {
 	buffer := make([]byte, 1)
 	_, err := io.ReadFull(client, buffer)
 	if err != nil {
-		fmt.Printf("cannot read size from client.")
+		fmt.Printf("cannot read size from client.\n")
 		return
 	}
 
 	buffer = make([]byte, buffer[0])
 	_, err = io.ReadFull(client, buffer)
 	if err != nil {
-		fmt.Printf("cannot read host from client.")
+		fmt.Printf("cannot read host from client.\n")
 		return
 	}
 	host, err := encrypt.Decrypt(buffer, key[:])
 	if err != nil {
-		fmt.Printf("ERROR: cannot decrypt host.")
+		fmt.Printf("ERROR: cannot decrypt host.\n")
 		return
 	}
 
 	buffer = make([]byte, 2)
 	_, err = io.ReadFull(client, buffer)
 	if err != nil {
-		fmt.Printf("cannot read port from client.")
+		fmt.Printf("cannot read port from client.\n")
 		return
 	}
 	port := binary.BigEndian.Uint16(buffer)
@@ -84,7 +84,10 @@ func handleClient(client net.Conn) {
 	url := net.JoinHostPort(string(host), strconv.Itoa(int(port)))
 	// fmt.Printf("url: %s\n", url)
 	remote, err := net.Dial("tcp", url)
-	check(err)
+	if err != nil {
+		fmt.Printf("ERROR: cannot dial to %s\n", url)
+		return
+	}
 
 	ch_client := make(chan []byte)
 	ch_remote := make(chan DataInfo)
