@@ -3,10 +3,15 @@ package main
 import (
 	"fmt"
 	"flag"
-	_ "bufio"
 	"io"
+	"io/ioutil"
 	"net"
-	_ "os"
+	"encoding/binary"
+	"crypto/sha256"
+	"os/user"
+	"path"
+	"strconv"
+	"strings"
 	"github.com/mitnk/goutils/encrypt"
 )
 
@@ -21,7 +26,6 @@ type DataInfo struct {
 	data []byte
 	size int
 }
-
 
 func main() {
 	port := flag.String("p", "3389", "port")
@@ -49,57 +53,103 @@ func main() {
 func handleClient(client net.Conn) {
     defer client.Close()
 
+	key := getKey()
 	buffer := make([]byte, 1)
-	n, err := io.ReadFull(client, buffer)
+	_, err := io.ReadFull(client, buffer)
 	if err != nil {
 		fmt.Printf("cannot read size from client.")
 		return
 	}
-	fmt.Printf("size: read %d bytes from client %v\n", n, buffer)
 
 	buffer = make([]byte, buffer[0])
-	n, err = io.ReadFull(client, buffer)
+	_, err = io.ReadFull(client, buffer)
 	if err != nil {
-		fmt.Printf("cannot read url from client.")
+		fmt.Printf("cannot read host from client.")
 		return
 	}
-	url, err := encrypt.Decrypt(buffer, key)
+	host, err := encrypt.Decrypt(buffer, key[:])
 	check(err)
-	fmt.Printf("url: %s\n", url)
 
-	buf_port := make([]byte, 2)
-	n, err = io.ReadFull(client, buf_port)
+	buffer = make([]byte, 2)
+	_, err = io.ReadFull(client, buffer)
 	if err != nil {
 		fmt.Printf("cannot read port from client.")
 		return
 	}
-	fmt.Printf("port: read %d bytes from client %v\n", n, buf_port)
+	port := binary.BigEndian.Uint16(buffer)
 
-	remote, err := net.Dial("tcp", string(buf_url) + string(port))
+	url := net.JoinHostPort(string(host), strconv.Itoa(int(port)))
+	// fmt.Printf("url: %s\n", url)
+	remote, err := net.Dial("tcp", url)
 	check(err)
 
-	ch_client := make(chan DataInfo)
+	ch_client := make(chan []byte)
 	ch_remote := make(chan DataInfo)
-	go readDataFromConn(ch_client, client)
-	go readDataFromConn(ch_remote, remote)
+	go readDataFromClient(ch_client, client, key[:])
+	go readDataFromRemote(ch_remote, remote)
 
 	for {
 		select {
-		case di := <-ch_client:
-			fmt.Printf("read %d bytes from client\n", di.size)
-			remote.Write(di.data[:di.size])
+		case data := <-ch_client:
+			if data == nil {
+				client.Close()
+				break
+			}
+			remote.Write(data)
 		case di := <-ch_remote:
-			fmt.Printf("read %d bytes from remote\n", di.size)
-			client.Write(di.data[:di.size])
+			if di.data == nil {
+				remote.Close()
+				break
+			}
+			buffer = encrypt.Encrypt(di.data[:di.size], key[:])
+			b := make([]byte, 2)
+			binary.BigEndian.PutUint16(b, uint16(len(buffer)))
+			client.Write(b)
+			client.Write(buffer)
 		}
 	}
 }
 
-func readDataFromConn(ch chan DataInfo, conn net.Conn) {
-	data := make([]byte, 8192)
-	n, err := conn.Read(data)
-	if err != nil {
-		return
+func readDataFromRemote(ch chan DataInfo, conn net.Conn) {
+	for {
+		data := make([]byte, 8192)
+		n, err := conn.Read(data)
+		if err != nil {
+			ch <- DataInfo{nil, 0}
+			return
+		}
+		ch <- DataInfo{data, n}
 	}
-	ch <- DataInfo{data, n}
+}
+
+func readDataFromClient(ch chan []byte, conn net.Conn, key []byte) {
+	for {
+		buffer := make([]byte, 2)
+		_, err := io.ReadFull(conn, buffer)
+		if err != nil {
+			ch <- nil
+			return
+		}
+		size := binary.BigEndian.Uint16(buffer)
+		buffer = make([]byte, size)
+		_, err = io.ReadFull(conn, buffer)
+		if err != nil {
+			ch <- nil
+			return
+		}
+		data, err := encrypt.Decrypt(buffer, key)
+		check(err)
+		ch <- data
+	}
+}
+
+
+func getKey() [32]byte {
+	usr, err := user.Current()
+	check(err)
+	fileKey := path.Join(usr.HomeDir, ".lightsockskey")
+	data, err := ioutil.ReadFile(fileKey)
+	s := strings.TrimSpace(string(data))
+	check(err)
+	return sha256.Sum256([]byte(s))
 }

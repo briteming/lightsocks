@@ -135,6 +135,8 @@ class Socket5Handler(socketserver.BaseRequestHandler):
             self.handle_tcp(remote)
         except Exception as e:
             logging.error('Got Exception: {}'.format(e))
+            import traceback
+            traceback.print_exc()
         finally:
             remote.close()
             D['R'] -= 1

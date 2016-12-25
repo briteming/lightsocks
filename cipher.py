@@ -35,11 +35,6 @@ class AESCipher:
         encrypted = IV + cipher.encrypt(pad(raw))
         return encrypted
 
-    def decrypt_old(self, enc):
-        IV = enc[:16]
-        cipher = AES.new(self.key, AES.MODE_CFB, IV)
-        return cipher.decrypt(enc[16:])
-
     def decrypt(self, encrypted):
         IV = encrypted[:16]
         cipher = AES.new(self.key, AES.MODE_CFB, IV, segment_size=128)
