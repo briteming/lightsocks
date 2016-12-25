@@ -2,3 +2,4 @@
 *.log
 *.beam
 *_local.py
+go/lightsocks

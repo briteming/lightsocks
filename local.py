@@ -148,14 +148,11 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Lightsocks')
-    parser.add_argument('--log-file', '-l', type=str,
-                        default='/tmp/lightsocks.log')
+    parser.add_argument('--log-file', '-l', type=str)
     parser.add_argument('--port', '-p', type=int)
     args = parser.parse_args()
 
     local_port = args.port if args.port else LOCAL_PORT
-    log_file = args.log_file if args.log_file else '/tmp/lightsocks.log'
-
     kwargs = {}
     if args.log_file:
         kwargs['filename'] = args.log_file

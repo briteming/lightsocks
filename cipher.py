@@ -1,5 +1,5 @@
 # http://stackoverflow.com/a/12525165/665869
-import base64
+import hashlib
 try:
     from Crypto.Cipher import AES
     from Crypto import Random
@@ -8,22 +8,41 @@ except:
     print('sudo pip3 install pycrypto==2.6.1')
     exit(1)
 
+
 from config import KEY
+
+BLOCK_SIZE = 16
+
+
+def pad(s):
+    span = BLOCK_SIZE - (len(s) % BLOCK_SIZE)
+    return s + bytes([span] * span)
+
+
+def unpad(s):
+    return s[0:-s[-1]]
 
 
 class AESCipher:
     def __init__(self, key):
-        self.key = key
+        self.key = hashlib.sha256(key).digest()
 
     def encrypt(self, raw):
         IV = Random.new().read(16)
-        cipher = AES.new(self.key, AES.MODE_CFB, IV)
-        return IV + cipher.encrypt(raw)
+        cipher = AES.new(self.key, AES.MODE_CFB, IV, segment_size=128)
+        encrypted = IV + cipher.encrypt(pad(raw))
+        return encrypted
 
-    def decrypt(self, enc):
+    def decrypt_old(self, enc):
         IV = enc[:16]
         cipher = AES.new(self.key, AES.MODE_CFB, IV)
         return cipher.decrypt(enc[16:])
+
+    def decrypt(self, encrypted):
+        IV = encrypted[:16]
+        cipher = AES.new(self.key, AES.MODE_CFB, IV, segment_size=128)
+        data = cipher.decrypt(encrypted[16:])
+        return unpad(data)
 
 
 ci = AESCipher(KEY)
@@ -42,17 +61,7 @@ if __name__ == '__main__':
     enc = encrypt(raw)
     assert decrypt(enc) == raw
 
-    raw = b'hello bob' * 1000
+    raw = b'hello bob' * 10000
     enc = encrypt(raw)
     assert decrypt(enc) == raw
     print("OK.")
-
-    print("")
-    s_32_1 = ''.join(['\\x{:02X}'.format(x) for x in Random.get_random_bytes(8)])
-    print("KEY = b'{}' \\".format(s_32_1))
-    s_32_2 = ''.join(['\\x{:02X}'.format(x) for x in Random.get_random_bytes(8)])
-    print("    b'{}' \\".format(s_32_2))
-    s_32_3 = ''.join(['\\x{:02X}'.format(x) for x in Random.get_random_bytes(8)])
-    print("    b'{}' \\".format(s_32_3))
-    s_32_4 = ''.join(['\\x{:02X}'.format(x) for x in Random.get_random_bytes(8)])
-    print("    b'{}'".format(s_32_4))
