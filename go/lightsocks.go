@@ -146,7 +146,6 @@ func readDataFromServer(ch chan DataInfo, conn net.Conn) {
 			ch <- DataInfo{nil, 0}
 			return
 		}
-		info("got %d bytes from server", n)
 		ch <- DataInfo{data, n}
 	}
 }
