@@ -12,9 +12,12 @@ import (
 	"path"
 	"strconv"
 	"strings"
+
 	"github.com/mitnk/goutils/encrypt"
 )
 
+var remoteDebug = false
+var countConnected = 0
 
 func check(e error) {
     if e != nil {
@@ -29,6 +32,7 @@ type DataInfo struct {
 
 func main() {
 	port := flag.String("p", "3389", "port")
+	debug := flag.Bool("v", false, "debug")
 	flag.Usage = func() {
         fmt.Printf("lightsocks [flags]\nwhere flags are:\n")
         flag.PrintDefaults()
@@ -36,6 +40,7 @@ func main() {
     flag.Parse()
     fmt.Printf("lightsocks v0.10\n")
 
+	remoteDebug = *debug
 	server, err := net.Listen("tcp", ":" + *port)
 	check(err)
 	defer server.Close()
@@ -52,7 +57,12 @@ func main() {
 
 func handleClient(client net.Conn) {
     defer client.Close()
+	countConnected += 1
+    defer func() {
+		countConnected -= 1
+	}()
 
+	info("connected from %v.", client.RemoteAddr())
 	key := getKey()
 	buffer := make([]byte, 1)
 	_, err := io.ReadFull(client, buffer)
@@ -88,23 +98,33 @@ func handleClient(client net.Conn) {
 		fmt.Printf("ERROR: cannot dial to %s\n", url)
 		return
 	}
+	info("connected to %s", url)
+	defer remote.Close()
 
 	ch_client := make(chan []byte)
 	ch_remote := make(chan DataInfo)
-	go readDataFromClient(ch_client, client, key[:])
+	go readDataFromClient(ch_client, ch_remote, client, key[:])
 	go readDataFromRemote(ch_remote, remote)
 
+	shouldStop := false
 	for {
+		if shouldStop {
+			break
+		}
+
 		select {
 		case data := <-ch_client:
 			if data == nil {
 				client.Close()
+				info("disconnected from local %v.", client.RemoteAddr())
+				shouldStop = true
 				break
 			}
 			remote.Write(data)
 		case di := <-ch_remote:
 			if di.data == nil {
 				remote.Close()
+				info("disconnected from remote %v.", remote.RemoteAddr())
 				break
 			}
 			buffer = encrypt.Encrypt(di.data[:di.size], key[:])
@@ -128,12 +148,13 @@ func readDataFromRemote(ch chan DataInfo, conn net.Conn) {
 	}
 }
 
-func readDataFromClient(ch chan []byte, conn net.Conn, key []byte) {
+func readDataFromClient(ch chan []byte, ch2 chan DataInfo, conn net.Conn, key []byte) {
 	for {
 		buffer := make([]byte, 2)
 		_, err := io.ReadFull(conn, buffer)
 		if err != nil {
 			ch <- nil
+			ch2 <- DataInfo{nil, 0}
 			return
 		}
 		size := binary.BigEndian.Uint16(buffer)
@@ -153,7 +174,6 @@ func readDataFromClient(ch chan []byte, conn net.Conn, key []byte) {
 	}
 }
 
-
 func getKey() [32]byte {
 	usr, err := user.Current()
 	check(err)
@@ -162,4 +182,12 @@ func getKey() [32]byte {
 	s := strings.TrimSpace(string(data))
 	check(err)
 	return sha256.Sum256([]byte(s))
+}
+
+func info(format string, a...interface{}) (n int, err error) {
+	if !remoteDebug {
+		return 0, nil
+	}
+	prefix := fmt.Sprintf("[%d] ", countConnected)
+	return fmt.Printf(prefix + format + "\n", a...)
 }
