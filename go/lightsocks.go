@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"math/rand"
 
 	"github.com/mitnk/goutils/encrypt"
 )
@@ -139,12 +140,13 @@ func handleClient(local net.Conn) {
 
 func readDataFromServer(ch chan DataInfo, conn net.Conn) {
 	for {
-		data := make([]byte, 8192)
+		data := make([]byte, 7000 + rand.Intn(2000))
 		n, err := conn.Read(data)
 		if err != nil {
 			ch <- DataInfo{nil, 0}
 			return
 		}
+		info("got %d bytes from server", n)
 		ch <- DataInfo{data, n}
 	}
 }
