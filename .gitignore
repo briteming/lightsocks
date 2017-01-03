@@ -3,4 +3,5 @@
 *.out
 *.beam
 *_local.py
-go/lightsocks
+lightsocks
+default.profraw

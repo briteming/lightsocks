@@ -1,3 +1,3 @@
 # LightSocks
 
-A SOCKS5 proxy server. Requires Python 3.5+
+A Generic Secure Proxy Server.

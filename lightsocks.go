@@ -18,8 +18,8 @@ import (
 	"github.com/mitnk/goutils/encrypt"
 )
 
-var remoteDebug = false
 var countConnected = 0
+var version = "1.0.0"
 
 func check(e error) {
     if e != nil {
@@ -33,16 +33,14 @@ type DataInfo struct {
 }
 
 func main() {
-	port := flag.String("p", "3389", "port")
-	debug := flag.Bool("v", false, "debug")
+	port := flag.String("p", "12345", "port")
 	flag.Usage = func() {
         fmt.Printf("lightsocks [flags]\nwhere flags are:\n")
         flag.PrintDefaults()
     }
     flag.Parse()
-    fmt.Printf("lightsocks v0.10\n")
+    fmt.Printf("lightsocks v%s\n", version)
 
-	remoteDebug = *debug
 	remote, err := net.Listen("tcp", ":" + *port)
 	check(err)
 	defer remote.Close()
@@ -187,9 +185,6 @@ func getKey() [32]byte {
 }
 
 func info(format string, a...interface{}) (n int, err error) {
-	if !remoteDebug {
-		return 0, nil
-	}
 	ts := time.Now().Format("2006-01-02 15:04:05")
 	prefix := fmt.Sprintf("[%s][%d] ", ts, countConnected)
 	return fmt.Printf(prefix + format + "\n", a...)
