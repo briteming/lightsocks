@@ -1,65 +1,54 @@
 package main
 
 import (
-	"fmt"
+	"crypto/sha256"
+	"encoding/binary"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
-	"encoding/binary"
-	"crypto/sha256"
 	"os/user"
 	"path"
 	"strconv"
 	"strings"
 	"time"
-	"math/rand"
 
 	"github.com/mitnk/goutils/encrypt"
 )
 
 var countConnected = 0
-var version = "1.0.0"
-
-func check(e error) {
-    if e != nil {
-        panic(e)
-    }
-}
-
-type DataInfo struct {
-	data []byte
-	size int
-}
+var version = "1.0.1"
 
 func main() {
 	port := flag.String("p", "12345", "port")
 	flag.Usage = func() {
-        fmt.Printf("lightsocks [flags]\nwhere flags are:\n")
-        flag.PrintDefaults()
-    }
-    flag.Parse()
-    fmt.Printf("lightsocks v%s\n", version)
+		fmt.Printf("lightsocks [flags]\nwhere flags are:\n")
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+	fmt.Printf("lightsocks v%s\n", version)
 
-	remote, err := net.Listen("tcp", ":" + *port)
+	remote, err := net.Listen("tcp", ":"+*port)
 	check(err)
 	defer remote.Close()
-    fmt.Printf("listen on port %s\n", *port)
+	fmt.Printf("listen on port %s\n", *port)
 
 	for {
-        local, err := remote.Accept()
-        if err != nil {
+		local, err := remote.Accept()
+		if err != nil {
 			fmt.Printf("Error: %v\n", err)
-            continue
-        }
-        go handleClient(local)
-    }
+			continue
+		}
+		go handleClient(local)
+	}
 }
 
 func handleClient(local net.Conn) {
-    defer local.Close()
+	defer local.Close()
 	countConnected += 1
-    defer func() {
+	defer func() {
 		countConnected -= 1
 	}()
 
@@ -138,7 +127,7 @@ func handleClient(local net.Conn) {
 
 func readDataFromServer(ch chan DataInfo, conn net.Conn) {
 	for {
-		data := make([]byte, 7000 + rand.Intn(2000))
+		data := make([]byte, 7000+rand.Intn(2000))
 		n, err := conn.Read(data)
 		if err != nil {
 			ch <- DataInfo{nil, 0}
@@ -184,8 +173,19 @@ func getKey() [32]byte {
 	return sha256.Sum256([]byte(s))
 }
 
-func info(format string, a...interface{}) (n int, err error) {
+func info(format string, a ...interface{}) (n int, err error) {
 	ts := time.Now().Format("2006-01-02 15:04:05")
 	prefix := fmt.Sprintf("[%s][%d] ", ts, countConnected)
-	return fmt.Printf(prefix + format + "\n", a...)
+	return fmt.Printf(prefix+format+"\n", a...)
+}
+
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
+
+type DataInfo struct {
+	data []byte
+	size int
 }
