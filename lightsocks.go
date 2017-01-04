@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net"
+	"os"
 	"os/user"
 	"path"
 	"reflect"
@@ -19,7 +20,7 @@ import (
 	"github.com/mitnk/goutils/encrypt"
 )
 
-var VERSION = "1.2.0"
+var VERSION = "1.2.1"
 var countConnected = 0
 var KEY = getKey()
 
@@ -32,7 +33,10 @@ func main() {
 	}
 	flag.Parse()
 	remote, err := net.Listen("tcp", ":"+*port)
-	check(err)
+	if err != nil {
+		fmt.Printf("net listen: %v\n", err)
+		os.Exit(2)
+	}
 	defer remote.Close()
 	info("lightsocks v%s", VERSION)
 	info("listen on port %s", *port)
@@ -184,11 +188,17 @@ func readDataFromLocal(ch chan []byte, ch2 chan DataInfo, conn net.Conn) {
 
 func getKey() []byte {
 	usr, err := user.Current()
-	check(err)
+	if err != nil {
+		fmt.Printf("user current: %v\n", err)
+		os.Exit(2)
+	}
 	fileKey := path.Join(usr.HomeDir, ".lightsockskey")
 	data, err := ioutil.ReadFile(fileKey)
+	if err != nil {
+		fmt.Printf("Failed to load key file: %v\n", err)
+		os.Exit(1)
+	}
 	s := strings.TrimSpace(string(data))
-	check(err)
 	sum := sha256.Sum256([]byte(s))
 	return sum[:]
 }
@@ -197,12 +207,6 @@ func info(format string, a ...interface{}) {
 	ts := time.Now().Format("2006-01-02 15:04:05")
 	prefix := fmt.Sprintf("[%s][%d] ", ts, countConnected)
 	fmt.Printf(prefix+format+"\n", a...)
-}
-
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
 }
 
 type DataInfo struct {
