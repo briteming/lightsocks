@@ -11,6 +11,7 @@ import (
 	"net"
 	"os/user"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -18,27 +19,28 @@ import (
 	"github.com/mitnk/goutils/encrypt"
 )
 
+var VERSION = "1.2.0"
 var countConnected = 0
-var version = "1.0.1"
+var KEY = getKey()
 
 func main() {
 	port := flag.String("p", "12345", "port")
 	flag.Usage = func() {
-		fmt.Printf("lightsocks [flags]\nwhere flags are:\n")
+		fmt.Printf("Usage of lightsocks v%s:\n", VERSION)
+		fmt.Printf("lightsocks [flags]\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	fmt.Printf("lightsocks v%s\n", version)
-
 	remote, err := net.Listen("tcp", ":"+*port)
 	check(err)
 	defer remote.Close()
-	fmt.Printf("listen on port %s\n", *port)
+	info("lightsocks v%s", VERSION)
+	info("listen on port %s", *port)
 
 	for {
 		local, err := remote.Accept()
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			info("error when accept: %v", err)
 			continue
 		}
 		go handleClient(local)
@@ -52,31 +54,48 @@ func handleClient(local net.Conn) {
 		countConnected -= 1
 	}()
 
-	info("local connected: %v.", local.RemoteAddr())
-	key := getKey()
+	info("local connected: %v", local.RemoteAddr())
 	buffer := make([]byte, 1)
 	_, err := io.ReadFull(local, buffer)
 	if err != nil {
-		fmt.Printf("cannot read size from local.\n")
+		info("cannot read first byte from local")
+		return
+	}
+	buffer = make([]byte, buffer[0])
+	_, err = io.ReadFull(local, buffer)
+	if err != nil {
+		info("cannot read validation data from local")
+		return
+	}
+	dataCheck, err := encrypt.Decrypt(buffer, KEY)
+	if err != nil || !reflect.DeepEqual(KEY[8:16], dataCheck) {
+		info("invalid local")
+		return
+	}
+
+	buffer = make([]byte, 1)
+	_, err = io.ReadFull(local, buffer)
+	if err != nil {
+		info("cannot read size from local")
 		return
 	}
 
 	buffer = make([]byte, buffer[0])
 	_, err = io.ReadFull(local, buffer)
 	if err != nil {
-		fmt.Printf("cannot read host from local.\n")
+		info("cannot read host from local")
 		return
 	}
-	host, err := encrypt.Decrypt(buffer, key[:])
+	host, err := encrypt.Decrypt(buffer, KEY)
 	if err != nil {
-		fmt.Printf("ERROR: cannot decrypt host.\n")
+		info("ERROR: cannot decrypt host")
 		return
 	}
 
 	buffer = make([]byte, 2)
 	_, err = io.ReadFull(local, buffer)
 	if err != nil {
-		fmt.Printf("cannot read port from local.\n")
+		info("cannot read port from local")
 		return
 	}
 	port := binary.BigEndian.Uint16(buffer)
@@ -84,7 +103,7 @@ func handleClient(local net.Conn) {
 	url := net.JoinHostPort(string(host), strconv.Itoa(int(port)))
 	server, err := net.Dial("tcp", url)
 	if err != nil {
-		fmt.Printf("ERROR: cannot dial to server %s\n", url)
+		info("ERROR: cannot dial to server %s", url)
 		return
 	}
 	info("connected to server: %s", url)
@@ -92,7 +111,7 @@ func handleClient(local net.Conn) {
 
 	ch_local := make(chan []byte)
 	ch_server := make(chan DataInfo)
-	go readDataFromLocal(ch_local, ch_server, local, key[:])
+	go readDataFromLocal(ch_local, ch_server, local)
 	go readDataFromServer(ch_server, server)
 
 	shouldStop := false
@@ -116,7 +135,7 @@ func handleClient(local net.Conn) {
 				info("server closed %v", server.RemoteAddr())
 				break
 			}
-			buffer = encrypt.Encrypt(di.data[:di.size], key[:])
+			buffer = encrypt.Encrypt(di.data[:di.size], KEY)
 			b := make([]byte, 2)
 			binary.BigEndian.PutUint16(b, uint16(len(buffer)))
 			local.Write(b)
@@ -137,7 +156,7 @@ func readDataFromServer(ch chan DataInfo, conn net.Conn) {
 	}
 }
 
-func readDataFromLocal(ch chan []byte, ch2 chan DataInfo, conn net.Conn, key []byte) {
+func readDataFromLocal(ch chan []byte, ch2 chan DataInfo, conn net.Conn) {
 	for {
 		buffer := make([]byte, 2)
 		_, err := io.ReadFull(conn, buffer)
@@ -153,7 +172,7 @@ func readDataFromLocal(ch chan []byte, ch2 chan DataInfo, conn net.Conn, key []b
 			ch <- nil
 			return
 		}
-		data, err := encrypt.Decrypt(buffer, key)
+		data, err := encrypt.Decrypt(buffer, KEY)
 		if err != nil {
 			fmt.Printf("ERROR: cannot decrypt data from local.")
 			ch <- nil
@@ -163,20 +182,21 @@ func readDataFromLocal(ch chan []byte, ch2 chan DataInfo, conn net.Conn, key []b
 	}
 }
 
-func getKey() [32]byte {
+func getKey() []byte {
 	usr, err := user.Current()
 	check(err)
 	fileKey := path.Join(usr.HomeDir, ".lightsockskey")
 	data, err := ioutil.ReadFile(fileKey)
 	s := strings.TrimSpace(string(data))
 	check(err)
-	return sha256.Sum256([]byte(s))
+	sum := sha256.Sum256([]byte(s))
+	return sum[:]
 }
 
-func info(format string, a ...interface{}) (n int, err error) {
+func info(format string, a ...interface{}) {
 	ts := time.Now().Format("2006-01-02 15:04:05")
 	prefix := fmt.Sprintf("[%s][%d] ", ts, countConnected)
-	return fmt.Printf(prefix+format+"\n", a...)
+	fmt.Printf(prefix+format+"\n", a...)
 }
 
 func check(e error) {
