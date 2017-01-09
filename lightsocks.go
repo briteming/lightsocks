@@ -20,7 +20,7 @@ import (
 	"github.com/mitnk/goutils/encrypt"
 )
 
-var VERSION = "1.2.1"
+var VERSION = "1.3.0"
 var countConnected = 0
 var KEY = getKey()
 
@@ -30,6 +30,7 @@ func main() {
 		fmt.Printf("Usage of lightsocks v%s:\n", VERSION)
 		fmt.Printf("lightsocks [flags]\n")
 		flag.PrintDefaults()
+		os.Exit(0)
 	}
 	flag.Parse()
 	remote, err := net.Listen("tcp", ":"+*port)
@@ -144,6 +145,9 @@ func handleClient(local net.Conn) {
 			binary.BigEndian.PutUint16(b, uint16(len(buffer)))
 			local.Write(b)
 			local.Write(buffer)
+		case <-time.After(120 * time.Second):
+			info("timeout on %s", url)
+			return
 		}
 	}
 }
