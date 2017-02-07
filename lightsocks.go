@@ -20,12 +20,14 @@ import (
 	"github.com/mitnk/goutils/encrypt"
 )
 
-var VERSION = "1.3.1"
+var VERSION = "1.3.2"
 var countConnected = 0
 var KEY = getKey()
+var DEBUG = false
 
 func main() {
 	port := flag.String("p", "12345", "port")
+	debug := flag.Bool("v", false, "verbose")
 	flag.Usage = func() {
 		fmt.Printf("Usage of lightsocks v%s:\n", VERSION)
 		fmt.Printf("lightsocks [flags]\n")
@@ -39,6 +41,8 @@ func main() {
 		os.Exit(2)
 	}
 	defer remote.Close()
+	DEBUG = *debug
+
 	info("lightsocks v%s", VERSION)
 	info("listen on port %s", *port)
 
@@ -160,6 +164,7 @@ func readDataFromServer(ch chan DataInfo, conn net.Conn) {
 			ch <- DataInfo{nil, 0}
 			return
 		}
+		debug("data from server:\n%s", data[:n])
 		ch <- DataInfo{data, n}
 	}
 }
@@ -186,6 +191,7 @@ func readDataFromLocal(ch chan []byte, ch2 chan DataInfo, conn net.Conn) {
 			ch <- nil
 			return
 		}
+		debug("data from local:\n%s", data)
 		ch <- data
 	}
 }
@@ -211,6 +217,12 @@ func info(format string, a ...interface{}) {
 	ts := time.Now().Format("2006-01-02 15:04:05")
 	prefix := fmt.Sprintf("[%s][%d] ", ts, countConnected)
 	fmt.Printf(prefix+format+"\n", a...)
+}
+
+func debug(format string, a ...interface{}) {
+	if DEBUG {
+		info(format, a...)
+	}
 }
 
 type DataInfo struct {
