@@ -20,7 +20,7 @@ import (
 	"github.com/mitnk/goutils/encrypt"
 )
 
-var VERSION = "1.3.2"
+var VERSION = "1.3.3"
 var countConnected = 0
 var KEY = getKey()
 var DEBUG = false
@@ -149,7 +149,7 @@ func handleClient(local net.Conn) {
 			binary.BigEndian.PutUint16(b, uint16(len(buffer)))
 			local.Write(b)
 			local.Write(buffer)
-		case <-time.After(120 * time.Second):
+		case <-time.After(60 * 60 * 3 * time.Second):
 			info("timeout on %s", url)
 			return
 		}
