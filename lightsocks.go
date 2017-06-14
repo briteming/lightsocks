@@ -192,6 +192,7 @@ func handleLocal(local net.Conn) {
 			server.Write(data)
 		case di, ok := <-ch_server:
 			if !ok {
+				shouldStop = true
 				break
 			}
 			buffer = encrypt.Encrypt(di.data[:di.size], KEY)
@@ -201,7 +202,8 @@ func handleLocal(local net.Conn) {
 			local.Write(buffer)
 		case <-time.After(120 * time.Second):
 			debug("timeout on %s", url)
-			return
+			shouldStop = true
+			break
 		}
 	}
 }
