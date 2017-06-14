@@ -18,16 +18,20 @@ import (
 	"time"
 
 	"github.com/mitnk/goutils/encrypt"
+	"github.com/orcaman/concurrent-map"
 )
 
-var VERSION = "1.3.2"
+var VERSION = "1.6.0"
 var countConnected = 0
 var KEY = getKey()
 var DEBUG = false
 
+var Servers = cmap.New()
+
 func main() {
-	port := flag.String("p", "12345", "port")
-	debug := flag.Bool("v", false, "verbose")
+	host := flag.String("host", "0.0.0.0", "host")
+	port := flag.String("port", "12345", "port")
+	_debug := flag.Bool("v", false, "verbose")
 	flag.Usage = func() {
 		fmt.Printf("Usage of lightsocks v%s:\n", VERSION)
 		fmt.Printf("lightsocks [flags]\n")
@@ -35,32 +39,76 @@ func main() {
 		os.Exit(0)
 	}
 	flag.Parse()
-	remote, err := net.Listen("tcp", ":"+*port)
+	remote, err := net.Listen("tcp", *host + ":" + *port)
 	if err != nil {
 		fmt.Printf("net listen: %v\n", err)
 		os.Exit(2)
 	}
 	defer remote.Close()
-	DEBUG = *debug
+	DEBUG = *_debug
 
 	info("lightsocks v%s", VERSION)
-	info("listen on port %s", *port)
+	info("listen on %s:%s", *host, *port)
 
+	go printServersInfo()
 	for {
 		local, err := remote.Accept()
 		if err != nil {
 			info("error when accept: %v", err)
 			continue
 		}
-		go handleClient(local)
+		go handleLocal(local)
 	}
 }
 
-func handleClient(local net.Conn) {
-	defer local.Close()
+func printServersInfo() {
+	for {
+		select {
+		case <-time.After(600 * time.Second):
+			ts_now := time.Now().Unix()
+			keys := Servers.Keys()
+			info("[REPORT] We have %d servers connected", len(keys))
+			for i, key := range keys {
+				if tmp, ok := Servers.Get(key); ok {
+					bytes := int64(0)
+					ts_span := int64(0)
+					if tmp, ok := tmp.(cmap.ConcurrentMap).Get("bytes"); ok {
+						bytes = tmp.(int64)
+					}
+					if tmp, ok := tmp.(cmap.ConcurrentMap).Get("ts"); ok {
+						ts_span = ts_now - tmp.(int64)
+					}
+
+					str_bytes := ""
+					if bytes > 1024 * 1024 * 1024 {
+						str_bytes += fmt.Sprintf("%.2fG", float64(bytes / (1024.0 * 1024.0 * 1024)))
+					} else if bytes > 1024 * 1024 {
+						str_bytes += fmt.Sprintf("%.2fM", float64(bytes / (1024.0 * 1024.0)))
+					} else {
+						str_bytes += fmt.Sprintf("%.2fK", float64(bytes * 1.0 / 1024.0))
+					}
+
+					str_span := ""
+					if ts_span > 3600 {
+						str_span += fmt.Sprintf("%dh", ts_span/3600)
+					}
+					if ts_span > 60 {
+						str_span += fmt.Sprintf("%dm", (ts_span % 3600) / 60)
+					}
+					str_span += fmt.Sprintf("%ds", ts_span % 60)
+					info("[REPORT] [%d][%s] %s: %s", i, str_span, key, str_bytes)
+				}
+			}
+		}
+	}
+}
+
+func handleLocal(local net.Conn) {
 	countConnected += 1
 	defer func() {
+		local.Close()
 		countConnected -= 1
+		debug("closed local")
 	}()
 
 	info("local connected: %v", local.RemoteAddr())
@@ -110,18 +158,24 @@ func handleClient(local net.Conn) {
 	port := binary.BigEndian.Uint16(buffer)
 
 	url := net.JoinHostPort(string(host), strconv.Itoa(int(port)))
-	server, err := net.Dial("tcp", url)
+	server, err := net.DialTimeout("tcp", url, time.Second * 60)
 	if err != nil {
-		info("ERROR: cannot dial to server %s", url)
+		info("ERROR: cannot dial to server %s: %v", url, err)
 		return
 	}
 	info("connected to server: %s", url)
-	defer server.Close()
+	initServers(url, 0)
+
+	defer func() {
+		server.Close()
+		deleteServers(url)
+		debug("closed server")
+	}()
 
 	ch_local := make(chan []byte)
 	ch_server := make(chan DataInfo)
-	go readDataFromLocal(ch_local, ch_server, local)
-	go readDataFromServer(ch_server, server)
+	go readDataFromLocal(ch_local, local)
+	go readDataFromServer(ch_server, server, url)
 
 	shouldStop := false
 	for {
@@ -130,18 +184,14 @@ func handleClient(local net.Conn) {
 		}
 
 		select {
-		case data := <-ch_local:
-			if data == nil {
-				local.Close()
-				info("local closed %v", local.RemoteAddr())
+		case data, ok := <-ch_local:
+			if !ok {
 				shouldStop = true
 				break
 			}
 			server.Write(data)
-		case di := <-ch_server:
-			if di.data == nil {
-				server.Close()
-				info("server closed %v", server.RemoteAddr())
+		case di, ok := <-ch_server:
+			if !ok {
 				break
 			}
 			buffer = encrypt.Encrypt(di.data[:di.size], KEY)
@@ -150,50 +200,56 @@ func handleClient(local net.Conn) {
 			local.Write(b)
 			local.Write(buffer)
 		case <-time.After(120 * time.Second):
-			info("timeout on %s", url)
+			debug("timeout on %s", url)
 			return
 		}
 	}
 }
 
-func readDataFromServer(ch chan DataInfo, conn net.Conn) {
+func readDataFromServer(ch chan DataInfo, conn net.Conn, url string) {
+	debug("enter readDataFromServer")
+	defer func() {
+		debug("leave readDataFromServer")
+	}()
 	for {
 		data := make([]byte, 7000+rand.Intn(2000))
 		n, err := conn.Read(data)
 		if err != nil {
-			ch <- DataInfo{nil, 0}
-			return
+			break
 		}
+		incrServers(url, int64(n))
 		debug("data from server:\n%s", data[:n])
 		ch <- DataInfo{data, n}
 	}
+	close(ch)
 }
 
-func readDataFromLocal(ch chan []byte, ch2 chan DataInfo, conn net.Conn) {
+func readDataFromLocal(ch chan []byte, conn net.Conn) {
+	debug("enter readDataFromLocal")
+	defer func() {
+		debug("leave readDataFromLocal")
+	}()
 	for {
 		buffer := make([]byte, 2)
 		_, err := io.ReadFull(conn, buffer)
 		if err != nil {
-			ch <- nil
-			ch2 <- DataInfo{nil, 0}
-			return
+			break
 		}
 		size := binary.BigEndian.Uint16(buffer)
 		buffer = make([]byte, size)
 		_, err = io.ReadFull(conn, buffer)
 		if err != nil {
-			ch <- nil
-			return
+			break
 		}
 		data, err := encrypt.Decrypt(buffer, KEY)
 		if err != nil {
 			fmt.Printf("ERROR: cannot decrypt data from local.")
-			ch <- nil
-			return
+			break
 		}
 		debug("data from local:\n%s", data)
 		ch <- data
 	}
+	close(ch)
 }
 
 func getKey() []byte {
@@ -211,6 +267,28 @@ func getKey() []byte {
 	s := strings.TrimSpace(string(data))
 	sum := sha256.Sum256([]byte(s))
 	return sum[:]
+}
+
+func initServers(key string, bytes int64) {
+	m := cmap.New()
+	now := time.Now()
+	m.Set("ts", now.Unix())
+	m.Set("bytes", bytes)
+	Servers.Set(key, m)
+}
+
+func incrServers(key string, n int64) {
+	if m, ok := Servers.Get(key); ok {
+		if tmp, ok := m.(cmap.ConcurrentMap).Get("bytes"); ok {
+			m.(cmap.ConcurrentMap).Set("bytes", tmp.(int64) + n)
+		}
+	} else {
+		initServers(key, n)
+	}
+}
+
+func deleteServers(key string) {
+	Servers.Remove(key)
 }
 
 func info(format string, a ...interface{}) {
