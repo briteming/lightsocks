@@ -21,7 +21,7 @@ import (
 	"github.com/orcaman/concurrent-map"
 )
 
-var VERSION = "1.6.0"
+var VERSION = "1.6.1"
 var countConnected = 0
 var KEY = getKey()
 var DEBUG = false
@@ -39,7 +39,7 @@ func main() {
 		os.Exit(0)
 	}
 	flag.Parse()
-	remote, err := net.Listen("tcp", *host + ":" + *port)
+	remote, err := net.Listen("tcp", *host+":"+*port)
 	if err != nil {
 		fmt.Printf("net listen: %v\n", err)
 		os.Exit(2)
@@ -80,12 +80,12 @@ func printServersInfo() {
 					}
 
 					str_bytes := ""
-					if bytes > 1024 * 1024 * 1024 {
-						str_bytes += fmt.Sprintf("%.2fG", float64(bytes / (1024.0 * 1024.0 * 1024)))
-					} else if bytes > 1024 * 1024 {
-						str_bytes += fmt.Sprintf("%.2fM", float64(bytes / (1024.0 * 1024.0)))
+					if bytes > 1024*1024*1024 {
+						str_bytes += fmt.Sprintf("%.2fG", float64(bytes)/(1024*1024*1024))
+					} else if bytes > 1024*1024 {
+						str_bytes += fmt.Sprintf("%.2fM", float64(bytes)/(1024*1024))
 					} else {
-						str_bytes += fmt.Sprintf("%.2fK", float64(bytes * 1.0 / 1024.0))
+						str_bytes += fmt.Sprintf("%.2fK", float64(bytes)/1024)
 					}
 
 					str_span := ""
@@ -93,9 +93,9 @@ func printServersInfo() {
 						str_span += fmt.Sprintf("%dh", ts_span/3600)
 					}
 					if ts_span > 60 {
-						str_span += fmt.Sprintf("%dm", (ts_span % 3600) / 60)
+						str_span += fmt.Sprintf("%dm", (ts_span%3600)/60)
 					}
-					str_span += fmt.Sprintf("%ds", ts_span % 60)
+					str_span += fmt.Sprintf("%ds", ts_span%60)
 					info("[REPORT] [%d][%s] %s: %s", i, str_span, key, str_bytes)
 				}
 			}
@@ -158,7 +158,14 @@ func handleLocal(local net.Conn) {
 	port := binary.BigEndian.Uint16(buffer)
 
 	url := net.JoinHostPort(string(host), strconv.Itoa(int(port)))
-	server, err := net.DialTimeout("tcp", url, time.Second * 60)
+	if strings.Contains(url, "[[") && strings.Contains(url, "]]") {
+		// not known yet why, but the url could be something like this:
+		// dial tcp: missing port in address [[::ffff:220.249.243.126]]:80
+		// we just fix it here.
+		url = strings.Replace(url, "[[", "[", 1)
+		url = strings.Replace(url, "]]", "]", 1)
+	}
+	server, err := net.DialTimeout("tcp", url, time.Second*60)
 	if err != nil {
 		info("ERROR: cannot dial to server %s: %v", url, err)
 		return
@@ -282,7 +289,7 @@ func initServers(key string, bytes int64) {
 func incrServers(key string, n int64) {
 	if m, ok := Servers.Get(key); ok {
 		if tmp, ok := m.(cmap.ConcurrentMap).Get("bytes"); ok {
-			m.(cmap.ConcurrentMap).Set("bytes", tmp.(int64) + n)
+			m.(cmap.ConcurrentMap).Set("bytes", tmp.(int64)+n)
 		}
 	} else {
 		initServers(key, n)
