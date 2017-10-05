@@ -21,7 +21,7 @@ import (
 	"github.com/orcaman/concurrent-map"
 )
 
-var VERSION = "1.6.1"
+var VERSION = "1.6.2"
 var countConnected = 0
 var KEY = getKey()
 var DEBUG = false
@@ -207,7 +207,7 @@ func handleLocal(local net.Conn) {
 			binary.BigEndian.PutUint16(b, uint16(len(buffer)))
 			local.Write(b)
 			local.Write(buffer)
-		case <-time.After(120 * time.Second):
+		case <-time.After(3600 * time.Second):
 			debug("timeout on %s", url)
 			shouldStop = true
 			break
