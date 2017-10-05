@@ -5,3 +5,5 @@
 *_local.py
 lightsocks
 default.profraw
+lightsocks-*
+lightsocks*.exe
