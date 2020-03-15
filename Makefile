@@ -1,6 +1,6 @@
 build:
-	go get github.com/mitnk/goutils/encrypt
-	go get github.com/orcaman/concurrent-map
+	go get -u github.com/mitnk/goutils/encrypt
+	go get -u github.com/orcaman/concurrent-map
 	go build -o lightsocks .
 
 all:
@@ -13,8 +13,8 @@ all:
 	GOOS=linux GOARCH=arm64 go build -o lightsocks-arm-64
 
 install:
-	go get github.com/mitnk/goutils/encrypt
-	go get github.com/orcaman/concurrent-map
+	go get -u github.com/mitnk/goutils/encrypt
+	go get -u github.com/orcaman/concurrent-map
 	go build -ldflags "-s -w" -o lightsocks && cp lightsocks /usr/local/bin/
 
 clean:
