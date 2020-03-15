@@ -21,7 +21,7 @@ import (
 	"github.com/orcaman/concurrent-map"
 )
 
-var VERSION = "1.6.2"
+var VERSION = "1.6.3"
 var countConnected = 0
 var KEY = getKey()
 var DEBUG = false
@@ -125,11 +125,14 @@ func handleLocal(local net.Conn) {
 		return
 	}
 	dataCheck, err := encrypt.Decrypt(buffer, KEY)
-	if err != nil || !reflect.DeepEqual(KEY[8:16], dataCheck) {
-		info("invalid local")
+	if err != nil {
+		info("invalid local: %v", err)
 		return
 	}
-
+	if !reflect.DeepEqual(KEY[8:16], dataCheck) {
+		info("invalid local: checker types not eq")
+		return
+	}
 	buffer = make([]byte, 1)
 	_, err = io.ReadFull(local, buffer)
 	if err != nil {
