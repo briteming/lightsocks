@@ -111,7 +111,7 @@ func handleLocal(local net.Conn) {
 		debug("closed local")
 	}()
 
-	info("local connected: %v", local.RemoteAddr())
+	debug("local connected: %v", local.RemoteAddr())
 	buffer := make([]byte, 1)
 	_, err := io.ReadFull(local, buffer)
 	if err != nil {
