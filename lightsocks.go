@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -21,10 +22,15 @@ import (
 	"github.com/orcaman/concurrent-map"
 )
 
-var VERSION = "1.6.3"
+var VERSION = "1.7.0"
 var countConnected = 0
 var KEY = getKey()
 var DEBUG = false
+
+type GoixyConfig struct {
+	Key        string
+}
+var GC GoixyConfig = GoixyConfig{}
 
 var Servers = cmap.New()
 
@@ -265,18 +271,18 @@ func readDataFromLocal(ch chan []byte, conn net.Conn) {
 }
 
 func getKey() []byte {
-	usr, err := user.Current()
-	if err != nil {
-		fmt.Printf("user current: %v\n", err)
+	b := getGoixyConfig()
+	if b == nil {
+		fmt.Printf("Goixy Config not found")
 		os.Exit(2)
 	}
-	fileKey := path.Join(usr.HomeDir, ".lightsockskey")
-	data, err := ioutil.ReadFile(fileKey)
+	err := json.Unmarshal(b, &GC)
 	if err != nil {
-		fmt.Printf("Failed to load key file: %v\n", err)
-		os.Exit(1)
+		fmt.Printf("invalid json in Goixy Config: %v\n", err)
+		os.Exit(2)
 	}
-	s := strings.TrimSpace(string(data))
+
+	s := strings.TrimSpace(GC.Key)
 	sum := sha256.Sum256([]byte(s))
 	return sum[:]
 }
@@ -301,6 +307,26 @@ func incrServers(key string, n int64) {
 
 func deleteServers(key string) {
 	Servers.Remove(key)
+}
+
+func getGoixyConfig() []byte {
+	usr, err := user.Current()
+	if err != nil {
+		fmt.Printf("user current: %v\n", err)
+		os.Exit(2)
+	}
+	fileConfig := path.Join(usr.HomeDir, ".goixy/config.json")
+	if _, err := os.Stat(fileConfig); os.IsNotExist(err) {
+		fmt.Printf("config file is missing: %v\n", fileConfig)
+		os.Exit(2)
+	}
+
+	data, err := ioutil.ReadFile(fileConfig)
+	if err != nil {
+		fmt.Printf("failed to load direct-servers file: %v\n", err)
+		os.Exit(1)
+	}
+	return data
 }
 
 func info(format string, a ...interface{}) {
