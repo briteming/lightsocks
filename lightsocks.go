@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -22,15 +21,10 @@ import (
 	"github.com/orcaman/concurrent-map"
 )
 
-var VERSION = "1.7.0"
+var VERSION = "1.7.1"
 var countConnected = 0
 var KEY = getKey()
 var DEBUG = false
-
-type GoixyConfig struct {
-	Key        string
-}
-var GC GoixyConfig = GoixyConfig{}
 
 var Servers = cmap.New()
 
@@ -271,18 +265,18 @@ func readDataFromLocal(ch chan []byte, conn net.Conn) {
 }
 
 func getKey() []byte {
-	b := getGoixyConfig()
-	if b == nil {
-		fmt.Printf("Goixy Config not found")
-		os.Exit(2)
-	}
-	err := json.Unmarshal(b, &GC)
+	usr, err := user.Current()
 	if err != nil {
-		fmt.Printf("invalid json in Goixy Config: %v\n", err)
+		fmt.Printf("user current: %v\n", err)
 		os.Exit(2)
 	}
-
-	s := strings.TrimSpace(GC.Key)
+	fileKey := path.Join(usr.HomeDir, ".lightsockskey")
+	data, err := ioutil.ReadFile(fileKey)
+	if err != nil {
+		fmt.Printf("Failed to load key file: %v\n", err)
+		os.Exit(1)
+	}
+	s := strings.TrimSpace(string(data))
 	sum := sha256.Sum256([]byte(s))
 	return sum[:]
 }
