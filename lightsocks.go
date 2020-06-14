@@ -303,26 +303,6 @@ func deleteServers(key string) {
 	Servers.Remove(key)
 }
 
-func getGoixyConfig() []byte {
-	usr, err := user.Current()
-	if err != nil {
-		fmt.Printf("user current: %v\n", err)
-		os.Exit(2)
-	}
-	fileConfig := path.Join(usr.HomeDir, ".goixy/config.json")
-	if _, err := os.Stat(fileConfig); os.IsNotExist(err) {
-		fmt.Printf("config file is missing: %v\n", fileConfig)
-		os.Exit(2)
-	}
-
-	data, err := ioutil.ReadFile(fileConfig)
-	if err != nil {
-		fmt.Printf("failed to load direct-servers file: %v\n", err)
-		os.Exit(1)
-	}
-	return data
-}
-
 func info(format string, a ...interface{}) {
 	ts := time.Now().Format("2006-01-02 15:04:05")
 	prefix := fmt.Sprintf("[%s][%d] ", ts, countConnected)
